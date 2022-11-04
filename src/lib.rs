@@ -1,3 +1,7 @@
+//! # cdp-rs
+//! `cdp-rs` is a Chrome Dev Protocol client, which allows interacting with a browser
+//! through the CDP protocol.
+
 use std::net::TcpStream;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -69,6 +73,8 @@ impl CdpClient {
 
     /// Creates a `CdpConnection` to a specifed targetId
     /// 
+    /// # Examples
+    /// 
     /// ```
     /// # use cdp_rs::CdpClient;
     /// 
@@ -90,6 +96,8 @@ impl CdpClient {
 
     /// Creates a `CdpConnection` to a the tab specified by index
     /// 
+    /// # Examples
+    /// 
     /// ```
     /// # use cdp_rs::CdpClient;
     /// 
@@ -109,6 +117,11 @@ impl CdpClient {
         Ok(CdpConnection::new(socket))
     }
 }
+impl Default for CdpClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// A connection to the browser isntance which can be used to send and recieve messages
 /// The connection connection will be closed when the variable is dropped
@@ -124,6 +137,8 @@ impl CdpConnection {
     /// Sends a message to the browser instance which doesnt require any parameters.
     /// This is the same as calling `send_parms` with an empty Vec
     /// 
+    /// # Examples
+    /// 
     /// ```
     /// # use cdp_rs::CdpClient;
     /// 
@@ -135,6 +150,8 @@ impl CdpConnection {
     }
 
     /// Sends a message to the browser instance with the supplied parameters
+    /// 
+    /// # Examples
     /// 
     /// ```
     /// # use cdp_rs::CdpClient;
@@ -163,6 +180,8 @@ impl CdpConnection {
 
     /// Waits for the next message to be recieved. Will block until a event is recieved
     /// 
+    /// # Examples
+    /// 
     /// ```
     /// # use cdp_rs::CdpClient;
     /// 
@@ -183,6 +202,8 @@ impl CdpConnection {
     }
 
     /// Waits for the specified event before returning. Will block until the event is found.
+    /// 
+    /// # Examples
     /// 
     /// ```
     /// # use cdp_rs::CdpClient;
