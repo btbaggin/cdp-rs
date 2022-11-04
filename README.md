@@ -7,6 +7,8 @@ chrome.exe --remote-debugging-port=9222
 
 ### Examples
 ```rust
+use cdp_rs::CdpClient;
+
 // Connect to the first tab of your open Chrome instance
 let cdp = CdpClient::new().connect_to_tab(0)
 
@@ -19,6 +21,8 @@ while Ok(m) = cdp.wait_message() {
 ```
 
 ```rust
+use cdp_rs::CdpClient;
+
 // Connect to first tab to a chrome instance running on a non-default remote-debugging-port
 let cdp = CdpClient::custom("localhost", 9000).connect_to_tab(0);
 // Send message with parameters and recieve the response
