@@ -57,15 +57,18 @@ pub struct CdpConnection {
 }
 impl CdpConnection {
     pub fn send(&mut self, method: &'static str) -> Result<Value, Error> {
-        self.send_parms::<()>(method, None)
+        let data = json!({
+            "id": self.message_id,
+            "method": method,
+            "params": {}
+        });
+        self.send_raw(data)
     }
 
-    pub fn send_parms<T: Into<Value>>(&mut self, method: &'static str, parms: Option<Vec<(&'static str, T)>>) -> Result<Value, Error> {
+    pub fn send_parms<T: Into<Value>>(&mut self, method: &'static str, parms: Vec<(&'static str, T)>) -> Result<Value, Error> {
         let mut map = serde_json::Map::new();
-        if let Some(parms) = parms {
-            for p in parms {
-                map.insert(p.0.to_string(), p.1.into());
-            }
+        for p in parms {
+            map.insert(p.0.to_string(), p.1.into());
         }
 
         let data = json!({
@@ -74,6 +77,10 @@ impl CdpConnection {
             "params": map
         });
         
+       self.send_raw(data)
+    }
+
+    fn send_raw(&mut self, data: Value) -> Result<Value, Error> {
         self.socket.write_message(tungstenite::Message::Text(data.to_string()))?;
         let result = self.wait_result();
         self.message_id += 1;

@@ -1,5 +1,11 @@
 [package]
 name = "cdp-rs"
+description = "Chrome Dev Protocol client written in Rust"
+categories = ["network-programming"]
+keywords = ["cdp", "chrome-dev-protocol"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/btbaggin/cdp-rs"
 version = "0.1.0"
 edition = "2021"
 
