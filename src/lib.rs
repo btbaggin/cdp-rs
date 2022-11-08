@@ -100,7 +100,7 @@ impl CdpClient {
     ///     // Use connection
     /// }
     /// ```
-    pub fn connect_to_target(&self, target_id: u32) -> Result<CdpConnection, ClientError> {
+    pub fn connect_to_target(&self, target_id: &str) -> Result<CdpConnection, ClientError> {
         let ws_url = format!("ws://{}:{}/devtools/page/{}", self.host, self.port, target_id);
         CdpClient::make_connection(&ws_url, self.port)
     }
