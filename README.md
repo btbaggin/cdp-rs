@@ -13,7 +13,7 @@ use cdp_rs::CdpClient;
 let mut cdp = CdpClient::new().connect_to_tab(0)
 
 // Send a message so we can recieve DOM events
-cdp.send("DOM.enable");
+cdp.send("DOM.enable", parms!());
 while Ok(m) = cdp.wait_message() {
     // Print out all messages recieved
     print!("Recieved: {}", m)
@@ -26,6 +26,6 @@ use cdp_rs::CdpClient;
 // Connect to first tab to a chrome instance running on a non-default remote-debugging-port
 let mut cdp = CdpClient::custom("localhost", 9000).connect_to_tab(0);
 // Send message with parameters and recieve the response
-let cookies = cdp.send_parms("Network.getCookies", vec![("urls", vec!["https://www.google.com"])])?;
+let cookies = cdp.send("Network.getCookies", parms!("urls", vec!["https://www.google.com"]))?;
 // Check cookies
 ```

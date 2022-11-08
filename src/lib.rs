@@ -94,7 +94,7 @@ impl CdpClient {
     /// 
     /// let client = CdpClient::new();
     /// let cdp = client.connect_to_tab(0);
-    /// if let Ok(r) = cdp.send_parms("Target.createTarget", vec![("url", "https://www.google.com")]) {
+    /// if let Ok(r) = cdp.send("Target.createTarget", parms!("url", "https://www.google.com")) {
     ///     let target_id = r["result"]["targetId"];
     ///     let cdp = client.connect_to_target(target_id);
     ///     // Use connection
@@ -127,7 +127,10 @@ impl CdpClient {
 
     fn make_connection(url: &str, port: u16) -> Result<CdpConnection, ClientError> {
         let url = Url::parse(&url).unwrap();
-        let addrs = url.socket_addrs(|| Some(port)).unwrap();
+        let mut addrs = url.socket_addrs(|| Some(port)).unwrap();
+        // Sort addresses by IPv4 first since IPv6 usually doesn't connect
+        addrs.sort();
+
         for addr in addrs {
             if let Ok(stream) = TcpStream::connect(addr) {
                 stream.set_nonblocking(true).unwrap();
@@ -142,6 +145,7 @@ impl CdpClient {
                 }
             }
         }
+        
 
         Err(ClientError::CannotConnect)
     }
@@ -179,7 +183,7 @@ impl CdpConnection {
     /// # use cdp_rs::CdpClient;
     /// 
     /// let mut cdp = CdpClient::new().connect_to_tab(0);
-    /// cdp.send("Network.getCookies", vec![("urls", vec!["https://www.google.com"])]);
+    /// cdp.send("Network.getCookies", parms!("urls", vec!["https://www.google.com"]));
     /// ```
     pub fn send(&mut self, method: &'static str, parms: Vec<(&'static str, MessageParameter)>) -> Result<Value, MessageError> {
         let message_id = self.message_id;
@@ -217,7 +221,7 @@ impl CdpConnection {
     /// # use cdp_rs::CdpClient;
     /// 
     /// let mut cdp = CdpClient::new().connect_to_tab(0);
-    /// let response = cdp.wait_event();
+    /// let response = cdp.wait_message();
     /// ```
     pub fn wait_message(&mut self) -> Result<Value, MessageError> {
         if let Ok(msg) = self.socket.read_message() {
@@ -239,12 +243,15 @@ impl CdpConnection {
     /// # use cdp_rs::CdpClient;
     /// 
     /// let mut cdp = CdpClient::new().connect_to_tab(0);
-    /// let response = cdp.wait_event("Network.dataReceived");
+    /// cdp.send("Network.enable", parms!()).unwrap();
+    /// let response = cdp.wait_event("Network.dataReceived", None);
     /// ```
     pub fn wait_event(&mut self, event: &str, timeout: Option<Duration>) -> Result<Value, MessageError> {
         self.wait_for(timeout, |m| {
             if let Some(method) = m.get("method") {
-                if method == event { return true }
+                if method == event {
+                    return true
+                }
             }
             return false
         })
@@ -286,7 +293,7 @@ impl Drop for CdpConnection {
         if self.socket.close(None).is_ok() {
             // Wait until close message is acknowledged by the other side
             for _ in 0..100 {
-                if let Err(Error::ConnectionClosed) = self.socket.write_pending() {
+                if matches!(self.socket.read_message(), Err(Error::ConnectionClosed) | Err(Error::AlreadyClosed)) {
                     break;
                 }
             }
