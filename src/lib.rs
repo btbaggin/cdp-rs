@@ -2,7 +2,7 @@
 //! `cdp-rs` is a Chrome Dev Protocol client, which allows interacting with a browser
 //! through the CDP protocol.
 
-use std::net::TcpStream;
+use std::{net::TcpStream, time::{Duration, Instant}};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tungstenite::{client, WebSocket, error::Error, handshake::HandshakeError};
@@ -10,7 +10,8 @@ use url::Url;
 
 /// Represents an error that occurred while making a network request
 pub type NetworkError = Error;
-/// Result type returned from methods that can error
+/// Parameter type to the send method
+pub type MessageParameter = Value;
 
 #[derive(Debug)]
 pub enum ClientError {
@@ -30,6 +31,8 @@ impl From<reqwest::Error> for ClientError {
 pub enum MessageError {
     /// An error occurred while sending or recieving a message
     NetworkError(NetworkError),
+    /// The sent request was invalid
+    InvalidRequest(Value),
     /// A response was recieved from the CDP connection that was not properly formatted
     InvalidResponse,
     /// Returned when calling a `wait` method on the CDP connection but no messages are available
@@ -150,6 +153,13 @@ impl Default for CdpClient {
     }
 }
 
+#[macro_export]
+macro_rules! parms {
+    ($($name:literal, $value:expr),*) => {{
+        vec![$(($name, cdp_rs::MessageParameter::from($value))),*]
+    }};
+}
+
 /// A connection to the browser isntance which can be used to send and recieve messages
 /// The connection connection will be closed when the variable is dropped
 pub struct CdpConnection {
@@ -161,21 +171,6 @@ impl CdpConnection {
         Self { socket, message_id: 1 }
     }
 
-    /// Sends a message to the browser instance which doesnt require any parameters.
-    /// This is the same as calling `send_parms` with an empty Vec
-    /// 
-    /// # Examples
-    /// 
-    /// ```
-    /// # use cdp_rs::CdpClient;
-    /// 
-    /// let mut cdp = CdpClient::new().connect_to_tab(0);
-    /// cdp.send("Network.getAllCookies");
-    /// ```
-    pub fn send(&mut self, method: &'static str) -> Result<Value, MessageError> {
-        self.send_parms::<()>(method, vec!())
-    }
-
     /// Sends a message to the browser instance with the supplied parameters
     /// 
     /// # Examples
@@ -184,12 +179,13 @@ impl CdpConnection {
     /// # use cdp_rs::CdpClient;
     /// 
     /// let mut cdp = CdpClient::new().connect_to_tab(0);
-    /// cdp.send_parms("Network.getCookies", vec![("urls", vec!["https://www.google.com"])]);
+    /// cdp.send("Network.getCookies", vec![("urls", vec!["https://www.google.com"])]);
     /// ```
-    pub fn send_parms<T: Into<Value>>(&mut self, method: &'static str, parms: Vec<(&'static str, T)>) -> Result<Value, MessageError> {
+    pub fn send(&mut self, method: &'static str, parms: Vec<(&'static str, MessageParameter)>) -> Result<Value, MessageError> {
+        let message_id = self.message_id;
         let mut map = serde_json::Map::new();
         for p in parms {
-            map.insert(p.0.to_string(), p.1.into());
+            map.insert(p.0.to_string(), p.1);
         }
 
         let data = json!({
@@ -198,10 +194,17 @@ impl CdpConnection {
             "params": map
         });
         
-        self.socket.write_message(tungstenite::Message::Text(data.to_string()))?;
-        let result = self.wait_result();
         self.message_id += 1;
+        self.socket.write_message(tungstenite::Message::Text(data.to_string()))?;
+        let result = self.wait_for(None, |m| {
+            (m.get("error").is_some() || m.get("result").is_some()) &&
+            m["id"].as_i64().unwrap() == message_id
+        });
 
+        // Check if there was an error response
+        if let Ok(r) = &result {
+            if r.get("error").is_some() { return Err(MessageError::InvalidRequest(r.clone())) }
+        }
         result
     }
 
@@ -238,8 +241,8 @@ impl CdpConnection {
     /// let mut cdp = CdpClient::new().connect_to_tab(0);
     /// let response = cdp.wait_event("Network.dataReceived");
     /// ```
-    pub fn wait_event(&mut self, event: &str) -> Result<Value, MessageError> {
-        self.wait_for(|m| {
+    pub fn wait_event(&mut self, event: &str, timeout: Option<Duration>) -> Result<Value, MessageError> {
+        self.wait_for(timeout, |m| {
             if let Some(method) = m.get("method") {
                 if method == event { return true }
             }
@@ -257,9 +260,16 @@ impl CdpConnection {
     /// let mut cdp = CdpClient::new().connect_to_tab(0);
     /// let response = cdp.wait_for(|m| { m.get("result").is_some() });
     /// ```
-    pub fn wait_for<F>(&mut self, f: F) -> Result<Value, MessageError>
+    pub fn wait_for<F>(&mut self, timeout: Option<Duration>, f: F) -> Result<Value, MessageError>
         where F: Fn(&Value) -> bool {
-        loop {
+
+        let timeout = match timeout {
+            Some(t) => t,
+            None => Duration::from_secs(300),
+        };
+
+        let now = Instant::now();
+        while Instant::now() - now < timeout {
             let m = self.wait_message();
             match m {
                 Ok(m) => if f(&m) { return Ok(m) },
@@ -270,12 +280,6 @@ impl CdpConnection {
         Err(MessageError::NoMessage)
     }
 
-    fn wait_result(&mut self) -> Result<Value, MessageError> {
-        let message_id = self.message_id;
-        self.wait_for(|m| {
-            m.get("result").is_some() && m["id"].as_i64().unwrap() == message_id
-        })
-    }
 }
 impl Drop for CdpConnection {
     fn drop(&mut self) {

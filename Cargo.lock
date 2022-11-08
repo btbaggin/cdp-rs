@@ -55,7 +55,7 @@ checksum = "581f5dba903aac52ea3feb5ec4810848460ee833876f1f9b0fdeab1f19091574"
 
 [[package]]
 name = "cdp-rs"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "mio",
  "reqwest",
