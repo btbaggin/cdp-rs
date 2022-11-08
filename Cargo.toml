@@ -6,7 +6,8 @@ keywords = ["cdp", "chrome-dev-protocol"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/btbaggin/cdp-rs"
-version = "0.1.0"
+documentation = "https://docs.rs/cdp-rs"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,3 +18,4 @@ url = "2.1.0"
 reqwest = { version = "^0.11", features = ["blocking", "json"] }
 serde = { version = "^1", features = ["derive"] }
 serde_json = "1.0"
+mio = "0.8.5"
