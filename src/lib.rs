@@ -64,7 +64,7 @@ pub struct Tab {
 /// The only purpose of this class is to get a `CdpConnection` which can be used
 /// to interact with the browser instance
 pub struct CdpClient {
-    host: &'static str,
+    host: String,
     port: u16,
 }
 impl CdpClient {
@@ -74,8 +74,8 @@ impl CdpClient {
     }
 
     /// Creates a new client connecting to a custom host and port
-    pub fn custom(host: &'static str, port: u16) -> Self {
-        Self { host, port }
+    pub fn custom(host: &str, port: u16) -> Self {
+        Self { host: host.to_string(), port }
     }
 
     /// Returns tabs from the browser instance
